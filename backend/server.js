@@ -11,6 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import authRoutes from './routes/authRoutes.js';
 import childRoutes from './routes/childRoutes.js';
 import gameRoutes from './routes/gameRoutes.js';
+import ttsRoutes from './routes/ttsRoutes.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/children', childRoutes);
 app.use('/api/games', gameRoutes);
+app.use('/api/tts', ttsRoutes);
 
 const PORT = process.env.PORT || 5000;
 

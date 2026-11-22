@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Google Cloud credentials and secret keys
+*credentials*.json
+*service-account*.json
+*gcp*.json
+google-key*.json
+*.pem
+*.key
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+*.log
+npm-debug.log*

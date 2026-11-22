@@ -343,6 +343,7 @@
         line-height: 1.4;
       }
       /* ---- Image ---- */
+     .question-img[hidden]{display:none !important;}
      .question-img{
 
 width:100%;
@@ -770,8 +771,11 @@ font-size:22px;
     <div class="container">
 
       <div id="quizScreen">
-        <!-- Image -->
-        <img id="questionImage" class="question-img" alt="Scenario image" />
+        <!-- Image: starts hidden with no alt text, so the browser can never
+             paint a placeholder box or "Scenario image" before the JS runs.
+             quiz.js reveals it per question, or hides it again if the
+             illustration is unreachable. -->
+        <img id="questionImage" class="question-img" alt="" hidden />
 
         <!-- Bear + Question side by side -->
         <div class="question-area">
@@ -806,6 +810,7 @@ font-size:22px;
     </div>
 
     <script src="questions.js"></script>
+    <script src="../js/ttsPlayer.js"></script>
     <script>
       const API = "http://localhost:5000/api";
       const token = localStorage.getItem("token");
@@ -844,6 +849,7 @@ font-size:22px;
 
       // ---- Load next question (Rasch 1PL IRT adaptive selection) ----
       async function loadQuestion() {
+        if (window.TTSPlayer) TTSPlayer.stop();
         selected = null;
         answered = false;
         document.getElementById("quizScreen").style.display = "block";
@@ -873,17 +879,24 @@ font-size:22px;
           shownKeys.push(currentQuestion.questionKey);
 
           const imgEl = document.getElementById("questionImage");
+          imgEl.removeAttribute("src");
           // A missing or broken illustration must never block the question,
           // so fall back to text-only if the file is unreachable.
           imgEl.onerror = () => {
             console.warn("[quiz] scenario image failed to load:", imgEl.src);
+            imgEl.hidden = true;
             imgEl.style.display = "none";
             imgEl.removeAttribute("src");
           };
           if (currentQuestion.image) {
+            // Reveal straight away rather than waiting for the load event:
+            // a browser that answers from cache may never fire "load", which
+            // would otherwise leave the illustration stuck hidden.
+            imgEl.hidden = false;
             imgEl.style.display = "block";
             imgEl.src = currentQuestion.image;
           } else {
+            imgEl.hidden = true;
             imgEl.style.display = "none";
             imgEl.removeAttribute("src");
           }
@@ -901,7 +914,7 @@ font-size:22px;
             optionsDiv.appendChild(div);
           });
 
-          repeatQuestion();
+          readQuestionAndOptions();
           // Response-time measurement starts when the question is displayed.
           questionShownAt = Date.now();
         } catch (err) {
@@ -916,25 +929,32 @@ font-size:22px;
         }
       }
 
+      function readQuestionAndOptions() {
+        if (!currentQuestion || !window.TTSPlayer) return;
+        const items = [];
+        if (currentQuestion.q) {
+          items.push(currentQuestion.q);
+        }
+        if (Array.isArray(currentQuestion.options)) {
+          currentQuestion.options.forEach((opt, i) => {
+            items.push(`Option ${String.fromCharCode(65 + i)}: ${opt}`);
+          });
+        }
+        TTSPlayer.speakSequence(items, 400);
+      }
+
       function repeatQuestion() {
-        if (currentQuestion && window.speechSynthesis) {
-          speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(currentQuestion.q);
-          u.rate = 0.9;
-          u.pitch = 1.1;
-          speechSynthesis.speak(u);
+        if (currentQuestion && currentQuestion.q && window.TTSPlayer) {
+          TTSPlayer.speak(currentQuestion.q);
         }
       }
 
       function readOptions() {
-        if (!currentQuestion || !window.speechSynthesis) return;
-        speechSynthesis.cancel();
-        currentQuestion.options.forEach((opt, i) => {
-          const u = new SpeechSynthesisUtterance(`Option ${i + 1}: ${opt}`);
-          u.rate = 0.9;
-          u.pitch = 1.1;
-          setTimeout(() => speechSynthesis.speak(u), i * 2500);
-        });
+        if (!currentQuestion || !Array.isArray(currentQuestion.options) || !window.TTSPlayer) return;
+        const optionTexts = currentQuestion.options.map((opt, i) =>
+          `Option ${String.fromCharCode(65 + i)}: ${opt}`
+        );
+        TTSPlayer.speakSequence(optionTexts);
       }
 
       async function handleOptionClick(div, selectedIndex) {
@@ -977,6 +997,9 @@ font-size:22px;
             feedbackEl.innerHTML =
               '✅ <span style="color:#28a745;">Correct! Great job!</span>';
             bearReact(true);
+            if (window.TTSPlayer) {
+              TTSPlayer.speak("Correct! Great job!");
+            }
           } else {
             div.classList.add("wrong");
             if (correctIndex !== undefined) {
@@ -984,6 +1007,9 @@ font-size:22px;
             }
             feedbackEl.innerHTML = `❌ <span style="color:#dc3545;">Incorrect.</span> Correct: <strong>${data.correctAnswer}</strong>`;
             bearReact(false);
+            if (window.TTSPlayer) {
+              TTSPlayer.speak(`Incorrect. The correct answer is: ${data.correctAnswer}`);
+            }
           }
 
           document.getElementById("nextBtn").style.display = "block";
@@ -1039,6 +1065,7 @@ font-size:22px;
       }
 
       function nextQuestion() {
+        if (window.TTSPlayer) TTSPlayer.stop();
         index++;
         if (index < TOTAL_QUESTIONS) {
           loadQuestion();
@@ -1067,6 +1094,7 @@ font-size:22px;
       }
 
       function goBack() {
+        if (window.TTSPlayer) TTSPlayer.stop();
         window.location.href = "module_selection.html";
       }
 
